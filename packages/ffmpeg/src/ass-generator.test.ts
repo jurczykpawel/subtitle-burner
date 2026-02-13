@@ -1,0 +1,64 @@
+import { describe, it, expect } from 'vitest';
+import { generateASS } from './ass-generator';
+import { DEFAULT_SUBTITLE_STYLE } from '@subtitle-burner/types';
+import type { SubtitleCue } from '@subtitle-burner/types';
+
+const SAMPLE_CUES: SubtitleCue[] = [
+  { id: '1', startTime: 1, endTime: 4, text: 'Hello, world!' },
+  { id: '2', startTime: 5.5, endTime: 8, text: 'Line one\nLine two' },
+];
+
+describe('generateASS', () => {
+  it('generates valid ASS file structure', () => {
+    const result = generateASS(SAMPLE_CUES, DEFAULT_SUBTITLE_STYLE);
+    expect(result).toContain('[Script Info]');
+    expect(result).toContain('[V4+ Styles]');
+    expect(result).toContain('[Events]');
+  });
+
+  it('includes correct dialogue lines', () => {
+    const result = generateASS(SAMPLE_CUES, DEFAULT_SUBTITLE_STYLE);
+    expect(result).toContain('Dialogue: 0,0:00:01.00,0:00:04.00,Default,,0,0,0,,Hello, world!');
+  });
+
+  it('converts newlines to ASS line breaks', () => {
+    const result = generateASS(SAMPLE_CUES, DEFAULT_SUBTITLE_STYLE);
+    expect(result).toContain('Line one\\NLine two');
+  });
+
+  it('applies font family from style', () => {
+    const style = { ...DEFAULT_SUBTITLE_STYLE, fontFamily: 'Impact' };
+    const result = generateASS(SAMPLE_CUES, style);
+    expect(result).toContain('Impact');
+  });
+
+  it('applies font size from style', () => {
+    const style = { ...DEFAULT_SUBTITLE_STYLE, fontSize: 48 };
+    const result = generateASS(SAMPLE_CUES, style);
+    expect(result).toContain(',48,');
+  });
+
+  it('uses custom resolution', () => {
+    const result = generateASS(SAMPLE_CUES, DEFAULT_SUBTITLE_STYLE, 1280, 720);
+    expect(result).toContain('PlayResX: 1280');
+    expect(result).toContain('PlayResY: 720');
+  });
+
+  it('sorts cues by start time', () => {
+    const reversed: SubtitleCue[] = [
+      { id: '2', startTime: 5, endTime: 8, text: 'CUE_SECOND' },
+      { id: '1', startTime: 1, endTime: 4, text: 'CUE_FIRST' },
+    ];
+    const result = generateASS(reversed, DEFAULT_SUBTITLE_STYLE);
+    const firstIdx = result.indexOf('CUE_FIRST');
+    const secondIdx = result.indexOf('CUE_SECOND');
+    expect(firstIdx).toBeLessThan(secondIdx);
+  });
+
+  it('handles empty cues array', () => {
+    const result = generateASS([], DEFAULT_SUBTITLE_STYLE);
+    expect(result).toContain('[Events]');
+    // Should have header but no Dialogue lines
+    expect(result).not.toContain('Dialogue:');
+  });
+});
