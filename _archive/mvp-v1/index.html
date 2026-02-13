@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subtitle Burner - Napisy na Video</title>
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Sora:wght@600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Subtitle Burner</h1>
+            <div class="tagline">Wypala napisy w video • Bez watermarków • Offline</div>
+        </header>
+
+        <div class="workspace">
+            <div class="panel">
+                <h2 class="panel-title">📹 Podgląd</h2>
+
+                <div class="subtitle-preview">
+                    <video id="previewVideo" controls></video>
+                    <div class="subtitle-overlay" id="subtitleOverlay"></div>
+                </div>
+
+                <div id="videoInfo" class="filename" style="display: none;"></div>
+
+                <div class="timeline-container" id="timelineContainer" style="display: none;">
+                    <div class="timeline-header">
+                        <div class="timeline-title">⏱️ Timeline</div>
+                        <div class="timeline-time" id="timelineTime">00:00</div>
+                        <div class="timeline-controls">
+                            <button class="timeline-btn" id="zoomIn" title="Zoom in">🔍+</button>
+                            <button class="timeline-btn" id="zoomOut" title="Zoom out">🔍-</button>
+                            <button class="timeline-btn" id="addSubtitle" title="Dodaj napis">➕ Napis</button>
+                        </div>
+                    </div>
+                    <div class="timeline-scroll" id="timelineScroll">
+                        <div class="timeline-ruler" id="timelineRuler"></div>
+                        <div class="timeline-track" id="timelineTrack">
+                            <div class="timeline-playhead" id="playhead"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="subtitle-editor" id="subtitleEditor" style="display: none;">
+                    <div class="subtitle-editor-header">✏️ Edytor aktywnego napisu</div>
+                    <div class="subtitle-editor-grid">
+                        <div>
+                            <label>Tekst</label>
+                            <textarea id="editorText" rows="3"></textarea>
+                        </div>
+                        <div class="subtitle-editor-row">
+                            <div>
+                                <label>Start (sek)</label>
+                                <input type="number" id="editorStart" step="0.1" min="0">
+                            </div>
+                            <div>
+                                <label>Koniec (sek)</label>
+                                <input type="number" id="editorEnd" step="0.1" min="0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="subtitle-editor-actions">
+                        <button class="btn btn-primary" id="editorSave">💾 Zapisz</button>
+                        <button class="btn btn-secondary" id="editorCancel">↩️ Cofnij</button>
+                        <button class="btn btn-secondary" id="editorDelete">🗑 Usuń</button>
+                    </div>
+                    <div class="subtitle-list" id="subtitleList"></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2 class="panel-title">⚙️ Ustawienia</h2>
+
+                <div class="quick-actions is-hidden" id="quickActions">
+                    <button class="btn btn-secondary" id="changeVideoBtn">🎬 Zmień video</button>
+                    <button class="btn btn-secondary" id="changeSrtBtn">📝 Zmień SRT</button>
+                    <button class="btn btn-secondary" id="toggleSrtBtn">👁 Pokaż/ukryj SRT</button>
+                </div>
+
+                <div class="control-group" id="videoControls">
+                    <label>1. Wgraj Video</label>
+                    <div class="upload-zone" id="videoUploadZone">
+                        <div class="upload-icon">🎬</div>
+                        <div class="upload-text">Kliknij lub przeciągnij video</div>
+                        <div class="upload-hint">MP4, WebM, MOV</div>
+                    </div>
+                    <input type="file" id="videoInput" accept="video/*">
+                </div>
+
+                <div class="control-group" id="srtControls">
+                    <label>2. Wgraj plik SRT lub wklej treść</label>
+                    <div class="upload-zone" id="srtUploadZone">
+                        <div class="upload-icon">📝</div>
+                        <div class="upload-text">Kliknij lub przeciągnij plik SRT</div>
+                        <div class="upload-hint">lub wklej poniżej</div>
+                    </div>
+                    <input type="file" id="srtInput" accept=".srt">
+                    <textarea id="srtContent" placeholder="Lub wklej tutaj zawartość pliku SRT...
+
+Przykład:
+1
+00:00:00,000 --> 00:00:03,000
+To jest pierwszy napis
+
+2
+00:00:03,000 --> 00:00:06,000
+A to jest drugi napis"></textarea>
+                </div>
+
+                <div class="info-box requires-input is-hidden" id="stylingHeader">
+                    <strong>3. Stylowanie napisów</strong>
+                </div>
+
+                <div class="control-group requires-input is-hidden">
+                    <label>Czcionka</label>
+                    <select id="fontFamily">
+                        <option value="Arial">Arial</option>
+                        <option value="Helvetica">Helvetica</option>
+                        <option value="Impact">Impact</option>
+                        <option value="Georgia">Georgia</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                        <option value="Courier New">Courier New</option>
+                        <option value="Verdana">Verdana</option>
+                        <option value="Comic Sans MS">Comic Sans MS</option>
+                    </select>
+                </div>
+
+                <div class="control-group requires-input is-hidden">
+                    <label>Preset stylu</label>
+                    <select id="stylePreset"></select>
+                </div>
+
+                <div class="control-group requires-input is-hidden">
+                    <label>Rozmiar czcionki</label>
+                    <div class="slider-group">
+                        <input type="range" id="fontSize" min="20" max="80" value="48">
+                        <div class="slider-value"><span id="fontSizeValue">48</span>px</div>
+                    </div>
+                </div>
+
+                <div class="control-group requires-input is-hidden">
+                    <label>Kolor tekstu</label>
+                    <div class="color-picker-wrapper">
+                        <input type="text" id="fontColorText" value="#FFFFFF" readonly>
+                        <input type="color" id="fontColor" value="#FFFFFF">
+                    </div>
+                </div>
+
+                <div class="control-group requires-input is-hidden">
+                    <label>Kolor tła</label>
+                    <div class="color-picker-wrapper">
+                        <input type="text" id="bgColorText" value="#000000" readonly>
+                        <input type="color" id="bgColor" value="#000000">
+                    </div>
+                </div>
+
+                <div class="control-group requires-input is-hidden">
+                    <label>Obrys tekstu (px)</label>
+                    <div class="slider-group">
+                        <input type="range" id="outlineWidth" min="0" max="12" value="4">
+                        <div class="slider-value"><span id="outlineWidthValue">4</span>px</div>
+                    </div>
+                </div>
+
+                <div class="control-group requires-input is-hidden">
+                    <label>Cień (px)</label>
+                    <div class="slider-group">
+                        <input type="range" id="shadowSize" min="0" max="10" value="2">
+                        <div class="slider-value"><span id="shadowSizeValue">2</span>px</div>
+                    </div>
+                </div>
+
+                <div class="control-group requires-input is-hidden">
+                    <label>Wielkie litery</label>
+                    <select id="uppercase">
+                        <option value="off">Wyłączone</option>
+                        <option value="on">Włączone</option>
+                    </select>
+                </div>
+
+                <div class="control-group requires-input is-hidden">
+                    <label>Przezroczystość tła</label>
+                    <div class="slider-group">
+                        <input type="range" id="bgOpacity" min="0" max="100" value="70">
+                        <div class="slider-value"><span id="bgOpacityValue">70</span>%</div>
+                    </div>
+                </div>
+
+                <div class="control-group requires-input is-hidden">
+                    <label>Pozycja pionowa</label>
+                    <div class="slider-group">
+                        <input type="range" id="position" min="5" max="95" value="85">
+                        <div class="slider-value"><span id="positionValue">85</span>%</div>
+                    </div>
+                </div>
+
+                <div class="control-group requires-input is-hidden">
+                    <label>Tryb renderu</label>
+                    <select id="renderMode">
+                        <option value="server">Serwer (API)</option>
+                        <option value="local">Przeglądarka (lokalnie)</option>
+                    </select>
+                </div>
+
+                <div class="control-group requires-input is-hidden">
+                    <label>API Key (do renderu serwerowego)</label>
+                    <input type="text" id="apiKeyInput" placeholder="sbk_..." />
+                </div>
+
+                <div class="info-box requires-input is-hidden" id="quotaPanel">
+                    <strong>Limit renderów</strong>
+                    <div id="quotaInfo">Ładowanie limitu...</div>
+                </div>
+
+                <div class="info-box requires-input is-hidden">
+                    <strong>4. Presety użytkownika</strong>
+                    <div>Twórz własne presety stylów i używaj ich w UI oraz API.</div>
+                </div>
+
+                <div class="preset-manager requires-input is-hidden" id="presetManager">
+                    <label>Nazwa presetu</label>
+                    <input type="text" id="presetName" placeholder="np. Moje VEED">
+                    <div class="preset-actions">
+                        <button class="btn btn-primary" id="presetSave">💾 Zapisz nowy</button>
+                        <button class="btn btn-secondary" id="presetUpdate">♻️ Aktualizuj</button>
+                        <button class="btn btn-secondary" id="presetDelete">🗑 Usuń</button>
+                        <button class="btn btn-secondary" id="presetRefresh">🔄 Odśwież</button>
+                    </div>
+                    <div class="preset-list" id="presetList"></div>
+                </div>
+
+                <div class="info-box requires-input is-hidden">
+                    <strong>5. Projekty (edycja po API)</strong>
+                    <div>Eksport/import projektu pozwala na późniejsze poprawki po renderze z API.</div>
+                </div>
+
+                <div class="project-manager requires-input is-hidden" id="projectManager">
+                    <label>Nazwa projektu</label>
+                    <input type="text" id="projectName" placeholder="np. Film_01">
+                    <div class="project-actions">
+                        <button class="btn btn-primary" id="projectSave">💾 Zapisz do API</button>
+                        <button class="btn btn-secondary" id="projectExport">⬇️ Eksport JSON</button>
+                    </div>
+                    <div class="project-actions">
+                        <input type="text" id="projectId" placeholder="ID projektu z API">
+                        <button class="btn btn-secondary" id="projectLoad">⬆️ Wczytaj z API</button>
+                        <button class="btn btn-secondary" id="projectImport">📂 Import JSON</button>
+                        <input type="file" id="projectImportInput" accept="application/json" style="display:none;">
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-full requires-input is-hidden" id="renderBtn" disabled>
+                    🔥 Wypał napisy w video
+                </button>
+
+                <div id="status" class="status"></div>
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="assets/js/main.js"></script>
+</body>
+</html>
