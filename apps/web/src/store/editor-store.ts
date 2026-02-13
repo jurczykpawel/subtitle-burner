@@ -6,7 +6,8 @@ interface EditorState {
   // Video
   video: VideoMetadata | null;
   videoUrl: string | null;
-  setVideo: (video: VideoMetadata | null, url: string | null) => void;
+  videoFile: File | null;
+  setVideo: (video: VideoMetadata | null, url: string | null, file?: File | null) => void;
 
   // Playback
   currentTime: number;
@@ -38,7 +39,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   // Video
   video: null,
   videoUrl: null,
-  setVideo: (video, url) => set({ video, videoUrl: url }),
+  videoFile: null,
+  setVideo: (video, url, file = null) => set({ video, videoUrl: url, videoFile: file }),
 
   // Playback
   currentTime: 0,

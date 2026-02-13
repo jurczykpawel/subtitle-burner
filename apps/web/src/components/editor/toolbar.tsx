@@ -1,14 +1,16 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useEditorStore } from '@/store/editor-store';
 import { parseSRT, formatSRT } from '@subtitle-burner/ffmpeg';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { RenderDialog } from './render-dialog';
 
 export function Toolbar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const video = useEditorStore((s) => s.video);
+  const videoFile = useEditorStore((s) => s.videoFile);
   const cues = useEditorStore((s) => s.cues);
   const setCues = useEditorStore((s) => s.setCues);
   const setVideo = useEditorStore((s) => s.setVideo);
@@ -17,6 +19,8 @@ export function Toolbar() {
   const currentTime = useEditorStore((s) => s.currentTime);
   const setCurrentTime = useEditorStore((s) => s.setCurrentTime);
   const addCue = useEditorStore((s) => s.addCue);
+
+  const [renderOpen, setRenderOpen] = useState(false);
 
   const handleImportSRT = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -47,7 +51,7 @@ export function Toolbar() {
   };
 
   const handleNewProject = () => {
-    setVideo(null, null);
+    setVideo(null, null, null);
     setCues([]);
   };
 
@@ -58,62 +62,71 @@ export function Toolbar() {
   };
 
   return (
-    <div className="flex items-center gap-2 border-b px-4 py-2">
-      <span className="text-sm font-semibold">Subtitle Burner</span>
-      <Separator orientation="vertical" className="h-6" />
+    <>
+      <div className="flex items-center gap-2 border-b px-4 py-2">
+        <span className="text-sm font-semibold">Subtitle Burner</span>
+        <Separator orientation="vertical" className="h-6" />
 
-      <Button variant="ghost" size="sm" onClick={handleNewProject}>
-        New
-      </Button>
+        <Button variant="ghost" size="sm" onClick={handleNewProject}>
+          New
+        </Button>
 
-      <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>
-        Import SRT
-      </Button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".srt"
-        className="hidden"
-        onChange={handleImportSRT}
-      />
+        <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>
+          Import SRT
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".srt"
+          className="hidden"
+          onChange={handleImportSRT}
+        />
 
-      <Button variant="ghost" size="sm" onClick={handleExportSRT} disabled={cues.length === 0}>
-        Export SRT
-      </Button>
+        <Button variant="ghost" size="sm" onClick={handleExportSRT} disabled={cues.length === 0}>
+          Export SRT
+        </Button>
 
-      <Separator orientation="vertical" className="h-6" />
+        <Separator orientation="vertical" className="h-6" />
 
-      {/* Playback controls */}
-      <Button variant="ghost" size="sm" onClick={() => setCurrentTime(Math.max(0, currentTime - 5))}>
-        -5s
-      </Button>
-      <Button variant="ghost" size="sm" onClick={() => setIsPlaying(!isPlaying)}>
-        {isPlaying ? 'Pause' : 'Play'}
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() =>
-          setCurrentTime(Math.min(useEditorStore.getState().duration, currentTime + 5))
-        }
-      >
-        +5s
-      </Button>
-      <span className="text-xs text-muted-foreground tabular-nums">
-        {formatDisplayTime(currentTime)} / {formatDisplayTime(useEditorStore.getState().duration)}
-      </span>
+        {/* Playback controls */}
+        <Button variant="ghost" size="sm" onClick={() => setCurrentTime(Math.max(0, currentTime - 5))}>
+          -5s
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setIsPlaying(!isPlaying)}>
+          {isPlaying ? 'Pause' : 'Play'}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() =>
+            setCurrentTime(Math.min(useEditorStore.getState().duration, currentTime + 5))
+          }
+        >
+          +5s
+        </Button>
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {formatDisplayTime(currentTime)} / {formatDisplayTime(useEditorStore.getState().duration)}
+        </span>
 
-      <Separator orientation="vertical" className="h-6" />
+        <Separator orientation="vertical" className="h-6" />
 
-      <Button variant="outline" size="sm" onClick={handleAddCue}>
-        + Add Subtitle
-      </Button>
+        <Button variant="outline" size="sm" onClick={handleAddCue}>
+          + Add Subtitle
+        </Button>
 
-      <div className="flex-1" />
+        <div className="flex-1" />
 
-      <Button variant="default" size="sm" disabled={cues.length === 0}>
-        Render
-      </Button>
-    </div>
+        <Button
+          variant="default"
+          size="sm"
+          disabled={cues.length === 0}
+          onClick={() => setRenderOpen(true)}
+        >
+          Render
+        </Button>
+      </div>
+
+      <RenderDialog open={renderOpen} onOpenChange={setRenderOpen} videoFile={videoFile} />
+    </>
   );
 }

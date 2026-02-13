@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@subtitle-burner/ffmpeg": "workspace:*",
     "@subtitle-burner/types": "workspace:*",
     "class-variance-authority": "^0.7.1",

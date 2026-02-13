@@ -41,9 +41,9 @@ export function VideoUploader() {
             height: videoEl.videoHeight,
             mimeType: file.type,
           },
-          url
+          url,
+          file
         );
-        URL.revokeObjectURL(videoEl.src);
       };
       videoEl.src = url;
     },
