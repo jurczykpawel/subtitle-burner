@@ -20,7 +20,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: ./packages/database/node_modules/.bin/prisma generate --schema=packages/database/prisma/schema.prisma
+        run: ./node_modules/.bin/prisma generate --schema=packages/database/prisma/schema.prisma
 
       - name: Lint
         run: bun run lint
