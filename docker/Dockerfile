@@ -21,7 +21,7 @@ RUN bun install --frozen-lockfile
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN ./node_modules/.bin/prisma generate --schema=packages/database/prisma/schema.prisma
+RUN bunx prisma generate --schema=packages/database/prisma/schema.prisma
 RUN bun run build
 
 # Production
