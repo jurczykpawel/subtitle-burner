@@ -33,6 +33,9 @@ interface EditorState {
   // UI State
   zoom: number;
   setZoom: (zoom: number) => void;
+
+  // Reset
+  reset: () => void;
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -74,4 +77,19 @@ export const useEditorStore = create<EditorState>((set) => ({
   // UI
   zoom: 1,
   setZoom: (zoom) => set({ zoom }),
+
+  // Reset
+  reset: () =>
+    set({
+      video: null,
+      videoUrl: null,
+      videoFile: null,
+      currentTime: 0,
+      duration: 0,
+      isPlaying: false,
+      cues: [],
+      selectedCueId: null,
+      style: DEFAULT_SUBTITLE_STYLE,
+      zoom: 1,
+    }),
 }));

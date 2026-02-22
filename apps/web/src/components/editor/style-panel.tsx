@@ -1,6 +1,7 @@
 'use client';
 
-import { useEditorStore } from '@/store/editor-store';
+import { useTemplateBridge } from '@/lib/bridges/use-template-bridge';
+import { ALLOWED_FONT_FAMILIES, CAPTION_ANIMATION_STYLES, getAnimationStyleDisplayName } from '@subtitle-burner/core';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
@@ -13,20 +14,8 @@ import {
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-const FONT_FAMILIES = [
-  'Arial',
-  'Helvetica',
-  'Verdana',
-  'Georgia',
-  'Times New Roman',
-  'Courier New',
-  'Impact',
-  'Comic Sans MS',
-];
-
 export function StylePanel() {
-  const style = useEditorStore((s) => s.style);
-  const setStyle = useEditorStore((s) => s.setStyle);
+  const { style, updateStyle } = useTemplateBridge();
 
   return (
     <div className="border-b">
@@ -38,12 +27,12 @@ export function StylePanel() {
           {/* Font Family */}
           <div className="space-y-1">
             <Label className="text-xs">Font</Label>
-            <Select value={style.fontFamily} onValueChange={(v) => setStyle({ fontFamily: v })}>
+            <Select value={style.fontFamily} onValueChange={(v) => updateStyle({ fontFamily: v })}>
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {FONT_FAMILIES.map((font) => (
+                {ALLOWED_FONT_FAMILIES.map((font) => (
                   <SelectItem key={font} value={font} style={{ fontFamily: font }}>
                     {font}
                   </SelectItem>
@@ -57,9 +46,9 @@ export function StylePanel() {
             <Label className="text-xs">Size: {style.fontSize}px</Label>
             <Slider
               value={[style.fontSize]}
-              onValueChange={([v]) => setStyle({ fontSize: v })}
-              min={12}
-              max={72}
+              onValueChange={([v]) => updateStyle({ fontSize: v })}
+              min={8}
+              max={120}
               step={1}
             />
           </div>
@@ -71,7 +60,7 @@ export function StylePanel() {
               <Input
                 type="color"
                 value={style.fontColor}
-                onChange={(e) => setStyle({ fontColor: e.target.value })}
+                onChange={(e) => updateStyle({ fontColor: e.target.value })}
                 className="h-8 w-full cursor-pointer p-1"
               />
             </div>
@@ -80,7 +69,7 @@ export function StylePanel() {
               <Input
                 type="color"
                 value={style.backgroundColor}
-                onChange={(e) => setStyle({ backgroundColor: e.target.value })}
+                onChange={(e) => updateStyle({ backgroundColor: e.target.value })}
                 className="h-8 w-full cursor-pointer p-1"
               />
             </div>
@@ -91,7 +80,7 @@ export function StylePanel() {
             <Label className="text-xs">BG Opacity: {Math.round(style.backgroundOpacity * 100)}%</Label>
             <Slider
               value={[style.backgroundOpacity]}
-              onValueChange={([v]) => setStyle({ backgroundOpacity: v })}
+              onValueChange={([v]) => updateStyle({ backgroundOpacity: v })}
               min={0}
               max={1}
               step={0.05}
@@ -105,7 +94,7 @@ export function StylePanel() {
               <Input
                 type="color"
                 value={style.outlineColor}
-                onChange={(e) => setStyle({ outlineColor: e.target.value })}
+                onChange={(e) => updateStyle({ outlineColor: e.target.value })}
                 className="h-8 w-full cursor-pointer p-1"
               />
             </div>
@@ -113,9 +102,9 @@ export function StylePanel() {
               <Label className="text-xs">Width: {style.outlineWidth}</Label>
               <Slider
                 value={[style.outlineWidth]}
-                onValueChange={([v]) => setStyle({ outlineWidth: v })}
+                onValueChange={([v]) => updateStyle({ outlineWidth: v })}
                 min={0}
-                max={10}
+                max={20}
                 step={1}
               />
             </div>
@@ -126,9 +115,9 @@ export function StylePanel() {
             <Label className="text-xs">Position: {style.position}%</Label>
             <Slider
               value={[style.position]}
-              onValueChange={([v]) => setStyle({ position: v })}
-              min={5}
-              max={95}
+              onValueChange={([v]) => updateStyle({ position: v })}
+              min={0}
+              max={100}
               step={1}
             />
           </div>
@@ -145,7 +134,7 @@ export function StylePanel() {
                       ? 'border-primary bg-primary/10'
                       : 'border-border hover:bg-muted'
                   }`}
-                  onClick={() => setStyle({ alignment: align })}
+                  onClick={() => updateStyle({ alignment: align })}
                 >
                   {align}
                 </button>
@@ -162,7 +151,7 @@ export function StylePanel() {
                   : 'border-border hover:bg-muted'
               }`}
               onClick={() =>
-                setStyle({ fontWeight: style.fontWeight === 'bold' ? 'normal' : 'bold' })
+                updateStyle({ fontWeight: style.fontWeight === 'bold' ? 'normal' : 'bold' })
               }
             >
               B
@@ -174,11 +163,55 @@ export function StylePanel() {
                   : 'border-border hover:bg-muted'
               }`}
               onClick={() =>
-                setStyle({ fontStyle: style.fontStyle === 'italic' ? 'normal' : 'italic' })
+                updateStyle({ fontStyle: style.fontStyle === 'italic' ? 'normal' : 'italic' })
               }
             >
               I
             </button>
+          </div>
+
+          {/* Animation Style */}
+          <div className="space-y-1">
+            <Label className="text-xs">Animation</Label>
+            <Select
+              value={style.highlightColor ? 'karaoke' : 'none'}
+              onValueChange={() => {/* Animation set per-cue, not per-style */}}
+              disabled
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Per-cue setting" />
+              </SelectTrigger>
+              <SelectContent>
+                {CAPTION_ANIMATION_STYLES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {getAnimationStyleDisplayName(s)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">Animation style is set per subtitle cue</p>
+          </div>
+
+          {/* Karaoke Colors */}
+          <div className="flex gap-2">
+            <div className="flex-1 space-y-1">
+              <Label className="text-xs">Highlight</Label>
+              <Input
+                type="color"
+                value={style.highlightColor ?? '#ffff00'}
+                onChange={(e) => updateStyle({ highlightColor: e.target.value })}
+                className="h-8 w-full cursor-pointer p-1"
+              />
+            </div>
+            <div className="flex-1 space-y-1">
+              <Label className="text-xs">Upcoming</Label>
+              <Input
+                type="color"
+                value={style.upcomingColor ?? '#808080'}
+                onChange={(e) => updateStyle({ upcomingColor: e.target.value })}
+                className="h-8 w-full cursor-pointer p-1"
+              />
+            </div>
           </div>
         </div>
       </ScrollArea>

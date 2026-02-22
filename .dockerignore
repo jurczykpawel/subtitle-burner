@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build artifacts
+.next/
+dist/
+out/
+.turbo/
+
+# Version control
+.git/
+.gitignore
+
+# Environment (secrets)
+.env
+.env.local
+.env.production
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+playwright-report/
+test-results/
+
+# Misc
+*.log
+*.tsbuildinfo
+*.md
+!package.json

@@ -9,13 +9,15 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@prisma/client": "^6.3.1"
+    "@prisma/client": "~6.3.1"
   },
   "devDependencies": {
-    "prisma": "^6.3.1",
-    "typescript": "^5.7.3"
+    "prisma": "~6.3.1",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.0"
   }
 }

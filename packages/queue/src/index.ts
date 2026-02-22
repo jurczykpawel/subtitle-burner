@@ -7,16 +7,18 @@ export function detectDeploymentMode(): DeploymentMode {
   return 'vps';
 }
 
-export function createQueue(): QueueAdapter {
+export async function createQueue(): Promise<QueueAdapter> {
   const mode = detectDeploymentMode();
 
   if (mode === 'cloud') {
-    // Inngest adapter - loaded dynamically to avoid bundling unused deps
-    throw new Error('Inngest adapter not yet implemented');
+    const { InngestQueueAdapter } = await import('./inngest-adapter');
+    return new InngestQueueAdapter();
   }
 
-  // BullMQ adapter
-  throw new Error('BullMQ adapter not yet implemented');
+  const { BullMQQueueAdapter } = await import('./bullmq-adapter');
+  return new BullMQQueueAdapter();
 }
 
+export { InngestQueueAdapter } from './inngest-adapter';
+export { BullMQQueueAdapter } from './bullmq-adapter';
 export type { QueueAdapter, DeploymentMode };

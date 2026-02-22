@@ -81,6 +81,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text`
     .map((cue) => {
       const start = formatTime(cue.startTime, 'ass');
       const end = formatTime(cue.endTime, 'ass');
+
+      // If cue has per-word timing and karaoke animation, generate \kf tags
+      if (cue.words && cue.words.length > 0 && cue.animationStyle === 'karaoke') {
+        const karaokeText = cue.words
+          .map((word) => {
+            // \kf uses centiseconds (1/100 s)
+            const durationCs = Math.round((word.endTime - word.startTime) * 100);
+            return `{\\kf${durationCs}}${word.text}`;
+          })
+          .join(' ');
+        return `Dialogue: 0,${start},${end},Default,,0,0,0,,${karaokeText}`;
+      }
+
       // Replace newlines with ASS line break
       const text = cue.text.replace(/\n/g, '\\N');
       return `Dialogue: 0,${start},${end},Default,,0,0,0,,${text}`;

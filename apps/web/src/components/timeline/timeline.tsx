@@ -1,80 +1,73 @@
 'use client';
 
-import { useRef, useCallback, useEffect } from 'react';
-import { useEditorStore } from '@/store/editor-store';
+import { useRef, useCallback } from 'react';
+import { useTimelineBridge } from '@/lib/bridges/use-timeline-bridge';
+import { useSubtitleBridge } from '@/lib/bridges/use-subtitle-bridge';
+import { useKeyboardBridge } from '@/lib/bridges/use-keyboard-bridge';
+import { useUIStore } from '@/store/ui-store';
 
 export function Timeline() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const resizingRef = useRef(false);
 
-  const cues = useEditorStore((s) => s.cues);
-  const duration = useEditorStore((s) => s.duration);
-  const currentTime = useEditorStore((s) => s.currentTime);
-  const selectedCueId = useEditorStore((s) => s.selectedCueId);
-  const setCurrentTime = useEditorStore((s) => s.setCurrentTime);
-  const setSelectedCueId = useEditorStore((s) => s.setSelectedCueId);
-  const updateCue = useEditorStore((s) => s.updateCue);
-  const zoom = useEditorStore((s) => s.zoom);
-  const setZoom = useEditorStore((s) => s.setZoom);
+  const timelineHeight = useUIStore((s) => s.timelineHeight);
+  const setTimelineHeight = useUIStore((s) => s.setTimelineHeight);
 
-  const pixelsPerSecond = 50 * zoom;
-  const timelineWidth = Math.max(duration * pixelsPerSecond, 800);
+  const {
+    cues,
+    selectedCueId,
+    currentTime,
+    duration,
+    zoom,
+    snapEnabled,
+    pixelsPerSecond,
+    timelineWidth,
+    markers,
+    handleTimelineClick,
+    handleBlockMouseDown,
+    zoomIn,
+    zoomOut,
+    toggleSnap,
+    clearDrag,
+  } = useTimelineBridge();
 
-  // Click on timeline to seek
-  const handleTimelineClick = useCallback(
+  const { updateCue } = useSubtitleBridge();
+
+  // Register keyboard shortcuts
+  useKeyboardBridge();
+
+  // Resize handle for timeline height
+  const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const scrollLeft = containerRef.current?.scrollLeft || 0;
-      const x = e.clientX - rect.left + scrollLeft;
-      const time = x / pixelsPerSecond;
-      setCurrentTime(Math.max(0, Math.min(duration, time)));
+      e.preventDefault();
+      resizingRef.current = true;
+      document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
+
+      const startY = e.clientY;
+      const startHeight = timelineHeight;
+
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!resizingRef.current) return;
+        const dy = startY - ev.clientY;
+        setTimelineHeight(startHeight + dy);
+      };
+
+      const onMouseUp = () => {
+        resizingRef.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
     },
-    [pixelsPerSecond, duration, setCurrentTime]
+    [timelineHeight, setTimelineHeight]
   );
 
-  // Generate time markers
-  const markers: { time: number; label: string }[] = [];
-  const interval = zoom >= 2 ? 1 : zoom >= 1 ? 2 : 5;
-  for (let t = 0; t <= duration; t += interval) {
-    const m = Math.floor(t / 60);
-    const s = Math.floor(t % 60);
-    markers.push({ time: t, label: `${m}:${String(s).padStart(2, '0')}` });
-  }
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      const state = useEditorStore.getState();
-      switch (e.key) {
-        case ' ':
-          e.preventDefault();
-          useEditorStore.getState().setIsPlaying(!state.isPlaying);
-          break;
-        case 'ArrowLeft':
-          e.preventDefault();
-          setCurrentTime(Math.max(0, state.currentTime - (e.shiftKey ? 1 : 0.1)));
-          break;
-        case 'ArrowRight':
-          e.preventDefault();
-          setCurrentTime(Math.min(state.duration, state.currentTime + (e.shiftKey ? 1 : 0.1)));
-          break;
-        case 'Delete':
-        case 'Backspace':
-          if (state.selectedCueId) {
-            e.preventDefault();
-            useEditorStore.getState().removeCue(state.selectedCueId);
-          }
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setCurrentTime]);
-
-  // Drag state for subtitle blocks
+  // Drag handling for subtitle blocks
   const dragRef = useRef<{
     cueId: string;
     type: 'move' | 'resize-start' | 'resize-end';
@@ -83,90 +76,122 @@ export function Timeline() {
     origEnd: number;
   } | null>(null);
 
-  const handleBlockMouseDown = (
-    e: React.MouseEvent,
-    cueId: string,
-    type: 'move' | 'resize-start' | 'resize-end'
-  ) => {
-    e.stopPropagation();
-    const cue = cues.find((c) => c.id === cueId);
-    if (!cue) return;
+  const onBlockMouseDown = useCallback(
+    (
+      e: React.MouseEvent,
+      cueId: string,
+      type: 'move' | 'resize-start' | 'resize-end'
+    ) => {
+      handleBlockMouseDown(e, cueId, type);
 
-    setSelectedCueId(cueId);
-    dragRef.current = {
-      cueId,
-      type,
-      startX: e.clientX,
-      origStart: cue.startTime,
-      origEnd: cue.endTime,
-    };
+      const cue = cues.find((c) => c.id === cueId);
+      if (!cue) return;
 
-    const handleMouseMove = (ev: MouseEvent) => {
-      if (!dragRef.current) return;
-      const dx = ev.clientX - dragRef.current.startX;
-      const dt = dx / pixelsPerSecond;
+      dragRef.current = {
+        cueId,
+        type,
+        startX: e.clientX,
+        origStart: cue.startTime,
+        origEnd: cue.endTime,
+      };
 
-      switch (dragRef.current.type) {
-        case 'move': {
-          const newStart = Math.max(0, dragRef.current.origStart + dt);
-          const dur = dragRef.current.origEnd - dragRef.current.origStart;
-          const clampedStart = Math.min(newStart, duration - dur);
-          updateCue(dragRef.current.cueId, {
-            startTime: clampedStart,
-            endTime: clampedStart + dur,
-          });
-          break;
+      const handleMouseMove = (ev: MouseEvent) => {
+        if (!dragRef.current) return;
+        const dx = ev.clientX - dragRef.current.startX;
+        const dt = dx / pixelsPerSecond;
+
+        switch (dragRef.current.type) {
+          case 'move': {
+            const newStart = Math.max(0, dragRef.current.origStart + dt);
+            const dur = dragRef.current.origEnd - dragRef.current.origStart;
+            const clampedStart = Math.min(newStart, duration - dur);
+            updateCue(dragRef.current.cueId, {
+              startTime: clampedStart,
+              endTime: clampedStart + dur,
+            });
+            break;
+          }
+          case 'resize-start': {
+            const newStart = Math.max(
+              0,
+              Math.min(dragRef.current.origEnd - 0.1, dragRef.current.origStart + dt)
+            );
+            updateCue(dragRef.current.cueId, { startTime: newStart });
+            break;
+          }
+          case 'resize-end': {
+            const newEnd = Math.min(
+              duration,
+              Math.max(dragRef.current.origStart + 0.1, dragRef.current.origEnd + dt)
+            );
+            updateCue(dragRef.current.cueId, { endTime: newEnd });
+            break;
+          }
         }
-        case 'resize-start': {
-          const newStart = Math.max(0, Math.min(dragRef.current.origEnd - 0.1, dragRef.current.origStart + dt));
-          updateCue(dragRef.current.cueId, { startTime: newStart });
-          break;
-        }
-        case 'resize-end': {
-          const newEnd = Math.min(duration, Math.max(dragRef.current.origStart + 0.1, dragRef.current.origEnd + dt));
-          updateCue(dragRef.current.cueId, { endTime: newEnd });
-          break;
-        }
-      }
-    };
+      };
 
-    const handleMouseUp = () => {
-      dragRef.current = null;
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
+      const handleMouseUp = () => {
+        dragRef.current = null;
+        clearDrag();
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    },
+    [cues, pixelsPerSecond, duration, handleBlockMouseDown, updateCue, clearDrag]
+  );
 
   if (duration === 0) return null;
 
   return (
-    <div className="border-t">
-      {/* Zoom controls */}
+    <div className="border-t" style={{ height: timelineHeight }}>
+      {/* Resize handle */}
+      <div
+        className="group flex h-1.5 cursor-row-resize items-center justify-center hover:bg-primary/20"
+        onMouseDown={handleResizeStart}
+      >
+        <div className="h-px w-8 rounded bg-muted-foreground/30 group-hover:bg-primary" />
+      </div>
+
+      {/* Zoom + snap controls */}
       <div className="flex items-center gap-2 border-b px-3 py-1">
         <span className="text-xs text-muted-foreground">Zoom:</span>
         <button
           className="rounded border px-2 py-0.5 text-xs hover:bg-muted"
-          onClick={() => setZoom(Math.max(0.25, zoom / 2))}
+          onClick={zoomOut}
         >
           -
         </button>
         <span className="text-xs tabular-nums">{Math.round(zoom * 100)}%</span>
         <button
           className="rounded border px-2 py-0.5 text-xs hover:bg-muted"
-          onClick={() => setZoom(Math.min(8, zoom * 2))}
+          onClick={zoomIn}
         >
           +
+        </button>
+
+        <div className="mx-2 h-4 w-px bg-border" />
+
+        <button
+          className={`rounded border px-2 py-0.5 text-xs ${
+            snapEnabled
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'hover:bg-muted'
+          }`}
+          onClick={toggleSnap}
+        >
+          Snap
         </button>
       </div>
 
       {/* Timeline area */}
       <div
         ref={containerRef}
-        className="relative h-32 overflow-x-auto overflow-y-hidden"
-        onClick={handleTimelineClick}
+        className="relative overflow-x-auto overflow-y-hidden"
+        style={{ height: 'calc(100% - 30px)' }}
+        onClick={(e) => handleTimelineClick(e, containerRef)}
       >
         <div className="relative" style={{ width: timelineWidth, height: '100%' }}>
           {/* Time markers */}
@@ -201,13 +226,13 @@ export function Timeline() {
                   {/* Left resize handle */}
                   <div
                     className="h-full w-1 shrink-0 cursor-col-resize bg-primary/40 hover:bg-primary"
-                    onMouseDown={(e) => handleBlockMouseDown(e, cue.id, 'resize-start')}
+                    onMouseDown={(e) => onBlockMouseDown(e, cue.id, 'resize-start')}
                   />
 
                   {/* Block body - draggable */}
                   <div
                     className="flex-1 cursor-grab truncate px-1 active:cursor-grabbing"
-                    onMouseDown={(e) => handleBlockMouseDown(e, cue.id, 'move')}
+                    onMouseDown={(e) => onBlockMouseDown(e, cue.id, 'move')}
                   >
                     {cue.text}
                   </div>
@@ -215,7 +240,7 @@ export function Timeline() {
                   {/* Right resize handle */}
                   <div
                     className="h-full w-1 shrink-0 cursor-col-resize bg-primary/40 hover:bg-primary"
-                    onMouseDown={(e) => handleBlockMouseDown(e, cue.id, 'resize-end')}
+                    onMouseDown={(e) => onBlockMouseDown(e, cue.id, 'resize-end')}
                   />
                 </div>
               );

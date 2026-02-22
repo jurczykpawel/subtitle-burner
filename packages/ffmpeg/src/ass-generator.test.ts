@@ -61,4 +61,44 @@ describe('generateASS', () => {
     // Should have header but no Dialogue lines
     expect(result).not.toContain('Dialogue:');
   });
+
+  it('generates karaoke \\kf tags for cues with words and karaoke animation', () => {
+    const karaokeCues: SubtitleCue[] = [
+      {
+        id: 'k1',
+        startTime: 0,
+        endTime: 3,
+        text: 'Hello beautiful world',
+        words: [
+          { text: 'Hello', startTime: 0, endTime: 1 },
+          { text: 'beautiful', startTime: 1, endTime: 2 },
+          { text: 'world', startTime: 2, endTime: 3 },
+        ],
+        animationStyle: 'karaoke',
+      },
+    ];
+    const result = generateASS(karaokeCues, DEFAULT_SUBTITLE_STYLE);
+    expect(result).toContain('{\\kf100}Hello');
+    expect(result).toContain('{\\kf100}beautiful');
+    expect(result).toContain('{\\kf100}world');
+  });
+
+  it('uses plain text for cues with words but non-karaoke animation', () => {
+    const cues: SubtitleCue[] = [
+      {
+        id: 'k2',
+        startTime: 0,
+        endTime: 2,
+        text: 'Hello world',
+        words: [
+          { text: 'Hello', startTime: 0, endTime: 1 },
+          { text: 'world', startTime: 1, endTime: 2 },
+        ],
+        animationStyle: 'word-highlight',
+      },
+    ];
+    const result = generateASS(cues, DEFAULT_SUBTITLE_STYLE);
+    expect(result).not.toContain('\\kf');
+    expect(result).toContain('Hello world');
+  });
 });

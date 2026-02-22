@@ -21,7 +21,9 @@ async function getFFmpeg(onProgress: ProgressCallback): Promise<FFmpeg> {
   ffmpeg = new FFmpeg();
 
   ffmpeg.on('log', ({ message }) => {
-    console.log('[ffmpeg]', message);
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[ffmpeg]', message);
+    }
   });
 
   ffmpeg.on('progress', ({ progress }) => {
@@ -29,7 +31,9 @@ async function getFFmpeg(onProgress: ProgressCallback): Promise<FFmpeg> {
     onProgress({ phase: 'rendering', progress: pct, message: `Rendering: ${pct}%` });
   });
 
-  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+  const baseURL =
+    process.env.NEXT_PUBLIC_FFMPEG_CORE_URL ??
+    'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
 
   await ffmpeg.load({
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),

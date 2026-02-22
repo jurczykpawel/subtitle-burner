@@ -2,7 +2,8 @@
 
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { useEditorStore } from '@/store/editor-store';
+import { useProjectStore } from '@/store/project-store';
+import { useTimelineStore } from '@/store/timeline-store';
 import { parseSRT } from '@subtitle-burner/ffmpeg';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,8 +18,9 @@ const ACCEPTED_VIDEO_TYPES = {
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 
 export function VideoUploader() {
-  const setVideo = useEditorStore((s) => s.setVideo);
-  const setCues = useEditorStore((s) => s.setCues);
+  const setVideo = useProjectStore((s) => s.setVideo);
+  const setCues = useProjectStore((s) => s.setCues);
+  const setDuration = useTimelineStore((s) => s.setDuration);
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
@@ -44,10 +46,11 @@ export function VideoUploader() {
           url,
           file
         );
+        setDuration(videoEl.duration);
       };
       videoEl.src = url;
     },
-    [setVideo]
+    [setVideo, setDuration]
   );
 
   const onDropSRT = useCallback(

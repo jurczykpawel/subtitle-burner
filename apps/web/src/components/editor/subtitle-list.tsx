@@ -1,19 +1,30 @@
 'use client';
 
-import { useEditorStore } from '@/store/editor-store';
+import { useSubtitleBridge } from '@/lib/bridges/use-subtitle-bridge';
+import {
+  CAPTION_ANIMATION_STYLES,
+  getAnimationStyleDisplayName,
+} from '@subtitle-burner/core';
+import type { CaptionAnimationStyle } from '@subtitle-burner/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export function SubtitleList() {
-  const cues = useEditorStore((s) => s.cues);
-  const selectedCueId = useEditorStore((s) => s.selectedCueId);
-  const setSelectedCueId = useEditorStore((s) => s.setSelectedCueId);
-  const updateCue = useEditorStore((s) => s.updateCue);
-  const removeCue = useEditorStore((s) => s.removeCue);
-  const setCurrentTime = useEditorStore((s) => s.setCurrentTime);
-
-  const sorted = [...cues].sort((a, b) => a.startTime - b.startTime);
+  const {
+    sortedCues,
+    selectedCueId,
+    selectCue,
+    updateCue,
+    removeCue,
+  } = useSubtitleBridge();
 
   const formatTime = (s: number) => {
     const min = Math.floor(s / 60);
@@ -25,11 +36,11 @@ export function SubtitleList() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="border-b px-3 py-2">
-        <h3 className="text-sm font-medium">Subtitles ({cues.length})</h3>
+        <h3 className="text-sm font-medium">Subtitles ({sortedCues.length})</h3>
       </div>
       <ScrollArea className="flex-1">
         <div className="space-y-1 p-2">
-          {sorted.map((cue) => (
+          {sortedCues.map((cue) => (
             <div
               key={cue.id}
               className={`cursor-pointer rounded-md border p-2 text-sm transition-colors ${
@@ -37,26 +48,35 @@ export function SubtitleList() {
                   ? 'border-primary bg-primary/5'
                   : 'border-transparent hover:bg-muted'
               }`}
-              onClick={() => {
-                setSelectedCueId(cue.id);
-                setCurrentTime(cue.startTime);
-              }}
+              onClick={() => selectCue(cue.id)}
             >
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>
                   {formatTime(cue.startTime)} → {formatTime(cue.endTime)}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeCue(cue.id);
-                  }}
-                >
-                  ×
-                </Button>
+                <div className="flex items-center gap-1">
+                  {cue.words && cue.words.length > 0 && (
+                    <span className="rounded bg-muted px-1 py-0.5 text-[10px]">
+                      {cue.words.length}w
+                    </span>
+                  )}
+                  {cue.animationStyle && cue.animationStyle !== 'none' && (
+                    <span className="rounded bg-primary/10 px-1 py-0.5 text-[10px] text-primary">
+                      {getAnimationStyleDisplayName(cue.animationStyle)}
+                    </span>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeCue(cue.id);
+                    }}
+                  >
+                    ×
+                  </Button>
+                </div>
               </div>
 
               {selectedCueId === cue.id ? (
@@ -90,6 +110,25 @@ export function SubtitleList() {
                       onClick={(e) => e.stopPropagation()}
                     />
                   </div>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <Select
+                      value={cue.animationStyle ?? 'none'}
+                      onValueChange={(v) =>
+                        updateCue(cue.id, { animationStyle: v as CaptionAnimationStyle })
+                      }
+                    >
+                      <SelectTrigger className="h-6 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CAPTION_ANIMATION_STYLES.map((style) => (
+                          <SelectItem key={style} value={style}>
+                            {getAnimationStyleDisplayName(style)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               ) : (
                 <p className="mt-1 truncate">{cue.text}</p>
@@ -97,7 +136,7 @@ export function SubtitleList() {
             </div>
           ))}
 
-          {cues.length === 0 && (
+          {sortedCues.length === 0 && (
             <p className="py-8 text-center text-sm text-muted-foreground">
               No subtitles yet. Click &quot;+ Add Subtitle&quot; or import an SRT file.
             </p>

@@ -1,74 +1,79 @@
 'use client';
 
-import { useRef, useEffect, useCallback } from 'react';
-import { useEditorStore } from '@/store/editor-store';
+import { useRef, useMemo } from 'react';
+import { usePlaybackBridge } from '@/lib/bridges/use-playback-bridge';
+import { useSubtitleBridge } from '@/lib/bridges/use-subtitle-bridge';
+import { useProjectStore } from '@/store/project-store';
+import { useTimelineStore } from '@/store/timeline-store';
+import { renderAnimatedCaption } from '@subtitle-burner/core';
+import type { WordSegment } from '@subtitle-burner/core';
+
+function SubtitleSegment({ segment }: { segment: WordSegment }) {
+  const isGradient = segment.color?.includes('gradient');
+
+  const baseStyle: React.CSSProperties = {
+    display: 'inline-block',
+    opacity: segment.opacity,
+    transform: `scale(${segment.scale}) translateY(${segment.offsetY}px)`,
+    transition: 'transform 0.1s ease-out, opacity 0.1s ease-out',
+  };
+
+  if (isGradient) {
+    return (
+      <span
+        style={{
+          ...baseStyle,
+          background: segment.color,
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+        }}
+      >
+        {segment.text}{' '}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      style={{
+        ...baseStyle,
+        ...(segment.color ? { color: segment.color } : {}),
+      }}
+    >
+      {segment.text}{' '}
+    </span>
+  );
+}
 
 export function VideoPlayer() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  const videoUrl = useEditorStore((s) => s.videoUrl);
-  const cues = useEditorStore((s) => s.cues);
-  const style = useEditorStore((s) => s.style);
-  const currentTime = useEditorStore((s) => s.currentTime);
-  const isPlaying = useEditorStore((s) => s.isPlaying);
-  const setCurrentTime = useEditorStore((s) => s.setCurrentTime);
-  const setDuration = useEditorStore((s) => s.setDuration);
-  const setIsPlaying = useEditorStore((s) => s.setIsPlaying);
+  const videoUrl = useProjectStore((s) => s.videoUrl);
+  const style = useProjectStore((s) => s.style);
+  const currentTime = useTimelineStore((s) => s.currentTime);
 
-  // Sync playback state
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+  const { videoProps } = usePlaybackBridge(videoRef);
+  const { activeCues } = useSubtitleBridge();
 
-    if (isPlaying) {
-      video.play().catch(() => setIsPlaying(false));
-    } else {
-      video.pause();
-    }
-  }, [isPlaying, setIsPlaying]);
-
-  // Time update handler
-  const onTimeUpdate = useCallback(() => {
-    const video = videoRef.current;
-    if (video) {
-      setCurrentTime(video.currentTime);
-    }
-  }, [setCurrentTime]);
-
-  const onLoadedMetadata = useCallback(() => {
-    const video = videoRef.current;
-    if (video) {
-      setDuration(video.duration);
-    }
-  }, [setDuration]);
-
-  // Seek to time when currentTime changes externally (e.g. from timeline click)
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (Math.abs(video.currentTime - currentTime) > 0.1) {
-      video.currentTime = currentTime;
-    }
-  }, [currentTime]);
-
-  // Get active cues for current time
-  const activeCues = cues.filter(
-    (cue) => currentTime >= cue.startTime && currentTime <= cue.endTime
+  const frames = useMemo(
+    () =>
+      activeCues.map((cue) =>
+        renderAnimatedCaption(cue, currentTime, {
+          highlightColor: style.highlightColor,
+          upcomingColor: style.upcomingColor,
+        })
+      ),
+    [activeCues, currentTime, style.highlightColor, style.upcomingColor]
   );
 
   return (
-    <div ref={containerRef} className="relative flex h-full items-center justify-center">
+    <div className="relative flex h-full items-center justify-center">
       <video
         ref={videoRef}
         src={videoUrl || undefined}
         className="max-h-full max-w-full"
-        onTimeUpdate={onTimeUpdate}
-        onLoadedMetadata={onLoadedMetadata}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        onEnded={() => setIsPlaying(false)}
-        onClick={() => setIsPlaying(!isPlaying)}
+        {...videoProps}
       />
 
       {/* Subtitle overlay */}
@@ -100,9 +105,24 @@ export function VideoPlayer() {
               whiteSpace: 'pre-wrap' as const,
             }}
           >
-            {activeCues.map((cue) => (
-              <div key={cue.id}>{cue.text}</div>
-            ))}
+            {activeCues.map((cue, cueIdx) => {
+              const frame = frames[cueIdx];
+              if (!frame?.visible) return null;
+
+              // If frame has multiple segments (animated), render per-word
+              if (frame.segments.length > 1 || (frame.segments.length === 1 && frame.segments[0].style !== 'normal')) {
+                return (
+                  <div key={cue.id}>
+                    {frame.segments.map((seg, i) => (
+                      <SubtitleSegment key={i} segment={seg} />
+                    ))}
+                  </div>
+                );
+              }
+
+              // Simple static rendering
+              return <div key={cue.id}>{cue.text}</div>;
+            })}
           </div>
         </div>
       )}

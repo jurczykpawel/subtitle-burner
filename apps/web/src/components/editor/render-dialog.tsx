@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useEditorStore } from '@/store/editor-store';
-import { renderVideo, type RenderProgress } from '@/lib/ffmpeg/client-renderer';
+import { useState } from 'react';
+import { useRenderBridge } from '@/lib/bridges/use-render-bridge';
+import { useAuth } from '@/components/providers/auth-provider';
+import { useProjectStore } from '@/store/project-store';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +12,15 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+type RenderMode = 'client' | 'server';
 
 interface RenderDialogProps {
   open: boolean;
@@ -18,61 +28,31 @@ interface RenderDialogProps {
   videoFile: File | null;
 }
 
-export function RenderDialog({ open, onOpenChange, videoFile }: RenderDialogProps) {
-  const cues = useEditorStore((s) => s.cues);
-  const style = useEditorStore((s) => s.style);
-  const video = useEditorStore((s) => s.video);
+export function RenderDialog({ open, onOpenChange }: RenderDialogProps) {
+  const video = useProjectStore((s) => s.video);
+  const cues = useProjectStore((s) => s.cues);
+  const { user } = useAuth();
 
-  const [progress, setProgress] = useState<RenderProgress>({
-    phase: 'loading',
-    progress: 0,
-    message: '',
-  });
-  const [isRendering, setIsRendering] = useState(false);
-  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const {
+    renderStatus,
+    renderProgress,
+    renderMessage,
+    renderResultUrl,
+    isRendering,
+    canRender,
+    renderClient,
+    renderServer,
+    downloadResult,
+    cleanup,
+  } = useRenderBridge();
 
-  const handleRender = useCallback(async () => {
-    if (!videoFile || !video) return;
+  const [mode, setMode] = useState<RenderMode>('client');
 
-    setIsRendering(true);
-    setResultUrl(null);
-
-    try {
-      const blob = await renderVideo(
-        videoFile,
-        cues,
-        style,
-        video.width,
-        video.height,
-        setProgress
-      );
-
-      const url = URL.createObjectURL(blob);
-      setResultUrl(url);
-    } catch (err) {
-      setProgress({
-        phase: 'error',
-        progress: 0,
-        message: err instanceof Error ? err.message : 'Render failed',
-      });
-    } finally {
-      setIsRendering(false);
-    }
-  }, [videoFile, video, cues, style]);
-
-  const handleDownload = () => {
-    if (!resultUrl) return;
-    const a = document.createElement('a');
-    a.href = resultUrl;
-    a.download = `${video?.filename?.replace(/\.[^.]+$/, '') || 'video'}_subtitled.mp4`;
-    a.click();
-  };
+  const handleRender = mode === 'client' ? renderClient : renderServer;
 
   const handleClose = (value: boolean) => {
-    if (isRendering) return; // Prevent closing during render
-    if (resultUrl) URL.revokeObjectURL(resultUrl);
-    setResultUrl(null);
-    setProgress({ phase: 'loading', progress: 0, message: '' });
+    if (isRendering) return;
+    cleanup();
     onOpenChange(value);
   };
 
@@ -81,9 +61,7 @@ export function RenderDialog({ open, onOpenChange, videoFile }: RenderDialogProp
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Render Video</DialogTitle>
-          <DialogDescription>
-            Burn subtitles into your video using browser-based FFmpeg.
-          </DialogDescription>
+          <DialogDescription>Burn subtitles into your video.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -101,45 +79,78 @@ export function RenderDialog({ open, onOpenChange, videoFile }: RenderDialogProp
             </p>
           </div>
 
+          {/* Render mode selector */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium">Render mode</span>
+            <Select
+              value={mode}
+              onValueChange={(v) => setMode(v as RenderMode)}
+              disabled={isRendering}
+            >
+              <SelectTrigger size="sm" className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="client">Browser (FFmpeg.wasm)</SelectItem>
+                <SelectItem value="server" disabled={!user}>
+                  Server{!user ? ' (sign in required)' : ''}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {mode === 'client' && (
+            <p className="text-xs text-muted-foreground">
+              Renders entirely in your browser. No upload needed, but slower on long videos.
+            </p>
+          )}
+          {mode === 'server' && (
+            <p className="text-xs text-muted-foreground">
+              Renders on our servers. Faster for long videos. Video is uploaded temporarily.
+            </p>
+          )}
+
           {/* Progress */}
           {isRendering && (
             <div className="space-y-2">
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full bg-primary transition-all duration-300"
-                  style={{ width: `${progress.progress}%` }}
+                  style={{ width: `${renderProgress}%` }}
                 />
               </div>
-              <p className="text-center text-sm text-muted-foreground">{progress.message}</p>
+              <p className="text-center text-sm text-muted-foreground">{renderMessage}</p>
             </div>
           )}
 
           {/* Error */}
-          {progress.phase === 'error' && (
+          {renderStatus === 'error' && (
             <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-              {progress.message}
+              {renderMessage}
             </div>
           )}
 
           {/* Result */}
-          {resultUrl && (
+          {renderResultUrl && (
             <div className="space-y-2">
               <div className="rounded-md bg-green-500/10 p-3 text-center text-sm text-green-600 dark:text-green-400">
                 Render complete!
               </div>
-              <video src={resultUrl} controls className="w-full rounded-md" />
+              {mode === 'client' && <video src={renderResultUrl} controls className="w-full rounded-md" />}
             </div>
           )}
         </div>
 
         {/* Actions */}
         <div className="flex justify-end gap-2">
-          {!resultUrl ? (
-            <Button onClick={handleRender} disabled={isRendering || cues.length === 0}>
+          {!renderResultUrl ? (
+            <Button
+              onClick={handleRender}
+              disabled={isRendering || !canRender}
+            >
               {isRendering ? 'Rendering...' : 'Start Render'}
             </Button>
           ) : (
-            <Button onClick={handleDownload}>Download</Button>
+            <Button onClick={downloadResult}>Download</Button>
           )}
         </div>
       </DialogContent>

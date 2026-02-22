@@ -8,7 +8,9 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@subtitle-burner/types": "workspace:*"
+    "@subtitle-burner/types": "workspace:*",
+    "bullmq": "^5.34.8",
+    "inngest": "^3.29.1"
   },
   "devDependencies": {
     "typescript": "^5.7.3"
