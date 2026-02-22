@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@subtitle-burner/types": "workspace:*",
-    "zod": "^3.23.0"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
