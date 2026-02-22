@@ -44,7 +44,7 @@ describe('GET /api/videos', () => {
 
   it('returns user videos', async () => {
     const videos = [
-      { id: 'v1', filename: 'test.mp4', _count: { subtitles: 1, renderJobs: 0 } },
+      { id: 'v1', filename: 'test.mp4', fileSize: BigInt(1024), _count: { subtitles: 1, renderJobs: 0 } },
     ];
     mockGetAuthUser.mockResolvedValue({ dbUser });
     mockGetVideosByUser.mockResolvedValue(videos);

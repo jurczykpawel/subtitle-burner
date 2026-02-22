@@ -9,11 +9,10 @@
 
 [![CI](https://github.com/jurczykpawel/subtitle-burner/actions/workflows/ci.yml/badge.svg)](https://github.com/jurczykpawel/subtitle-burner/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Status: Beta](https://img.shields.io/badge/Status-Beta-orange.svg)]()
-[![Tests: 414](https://img.shields.io/badge/Tests-414_passing-brightgreen.svg)]()
+[![Status: Beta](https://img.shields.io/badge/Status-Beta-orange.svg)](https://github.com/jurczykpawel/subtitle-burner)
 [![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen.svg)](docs/CONTRIBUTING.md)
 
-[Live Demo](https://demo.subtitleburner.com) | [Documentation](docs/) | [API Reference](#public-api-v1) | [Community](https://github.com/jurczykpawel/subtitle-burner/discussions) | [Report Bug](https://github.com/jurczykpawel/subtitle-burner/issues)
+[Documentation](docs/) | [API Reference](#public-api-v1) | [Community](https://github.com/jurczykpawel/subtitle-burner/discussions) | [Report Bug](https://github.com/jurczykpawel/subtitle-burner/issues)
 
 </div>
 
