@@ -14,7 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@prisma/client": "~6.3.1"
+    "@prisma/client": "~7.4.1"
   },
   "devDependencies": {
     "prisma": "~6.3.1",
